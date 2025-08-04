@@ -46,7 +46,7 @@ async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return CONFIRM
 
 async def confirm_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Publishes the post, generates a QR code and private link, and ends the conversation."""
+    """Publishes the post, generates a QR code and shareable link, and ends the conversation."""
     if update.message.text.lower() != 'yes':
         await update.message.reply_text("❌ Post canceled.")
         del user_data_store[update.effective_chat.id]
@@ -54,17 +54,41 @@ async def confirm_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = user_data_store[update.effective_chat.id]
 
-    campaign_channel = os.getenv("CAMPAIGN_CHANNEL")
-    if not campaign_channel:
-        await update.message.reply_text("❌ Configuration error: CAMPAIGN_CHANNEL not set.")
+    campaign_invite_link = os.getenv("CAMPAIGN_INVITE_LINK")
+    if not campaign_invite_link:
+        await update.message.reply_text("❌ Configuration error: CAMPAIGN_INVITE_LINK not set.")
+        del user_data_store[update.effective_chat.id]
+        return ConversationHandler.END
+
+    # We still need the channel ID to send the message, but it won't be used for the link.
+    campaign_channel_id = os.getenv("CAMPAIGN_CHANNEL")
+    if not campaign_channel_id:
+        await update.message.reply_text("❌ Configuration error: CAMPAIGN_CHANNEL (ID) not set.")
         del user_data_store[update.effective_chat.id]
         return ConversationHandler.END
 
     sent_msg = await context.bot.send_photo(
-        chat_id=campaign_channel,
+        chat_id=campaign_channel_id,
         photo=data['image_file_id'],
         caption=f"{data['text']}\n{data['link']}"
     )
+
+    # --- START OF CHANGE ---
+    # Generate the shareable link using the invite link and message ID
+    # The format is 'https://t.me/+invite_hash?comment=message_id'.
+    post_url = f"{campaign_invite_link}?comment={sent_msg.message_id}"
+    # --- END OF CHANGE ---
+
+    img = qrcode.make(post_url)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+        img.save(tmpfile.name)
+        with open(tmpfile.name, 'rb') as qr_code_file:
+            await update.message.reply_photo(photo=qr_code_file, caption=f"Here's your QR code.\nURL: {post_url}")
+        os.remove(tmpfile.name)
+
+    await update.message.reply_text("✅ Done!")
+    del user_data_store[update.effective_chat.id]
+    return ConversationHandler.END
 
     # --- START OF CHANGE ---
     # Generate the private link and QR code
