@@ -1,4 +1,2 @@
 python-telegram-bot[webhooks]==20.6
 qrcode
-pyTelegramBotAPI
-Pillow
