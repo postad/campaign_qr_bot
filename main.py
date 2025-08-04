@@ -1,7 +1,7 @@
 # main.py
 import os
-from telegram.ext import ApplicationBuilder, ConversationHandler, CommandHandler
-from campaign_qr_bot import conv_handler, view_post_command_handler
+from telegram.ext import ApplicationBuilder, ConversationHandler, CommandHandler   
+from campaign_qr_bot import conv_handler
 
 # Get the bot token from the environment variable
 BOT_TOKEN = os.getenv("BOT_TOKEN")
