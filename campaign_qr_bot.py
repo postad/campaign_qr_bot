@@ -43,43 +43,49 @@ async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ This is your post preview. Type 'yes' to confirm and publish.")
     return CONFIRM
 
-async def confirm_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Publishes the post, generates a QR code and a shareable command, and ends the conversation."""
+# The confirm_post function (with a public channel)
+
+async def confirm_post_public(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text.lower() != 'yes':
-        await update.message.reply_text("❌ Post canceled.")
-        del user_data_store[update.effective_chat.id]
+        # (your cancellation code here)
         return ConversationHandler.END
 
     data = user_data_store[update.effective_chat.id]
-
-    campaign_channel_id = os.getenv("CAMPAIGN_CHANNEL")
-    if not campaign_channel_id:
-        await update.message.reply_text("❌ Configuration error: CAMPAIGN_CHANNEL (ID) not set.")
-        del user_data_store[update.effective_chat.id]
+    
+    # Assume CAMPAIGN_CHANNEL is a public channel username like '@my_public_channel'
+    campaign_channel_username = os.getenv("CAMPAIGN_CHANNEL")
+    if not campaign_channel_username:
+        # (your error handling code here)
         return ConversationHandler.END
 
+    # Step 1: Post the full content to the public channel
     sent_msg = await context.bot.send_photo(
-        chat_id=campaign_channel_id,
+        chat_id=campaign_channel_username,
         photo=data['image_file_id'],
         caption=f"{data['text']}\n{data['link']}"
     )
 
-    # We now generate a special command that the user can send to the bot.
-    post_command = f"/view_post_{sent_msg.message_id}"
-    shareable_text = (
-        "Here's your shareable command. Instruct your audience to send this "
-        "command directly to this bot to view the post."
+    # Step 2: Get the post's URL
+    post_url = f"https://t.me/{campaign_channel_username[1:]}/{sent_msg.message_id}"
+
+    # Step 3: Edit the message to show only the link
+    await context.bot.edit_message_caption(
+        chat_id=campaign_channel_username,
+        message_id=sent_msg.message_id,
+        caption=f"Here is the post:\n{post_url}"
     )
 
-    # We will generate a QR code for this command
-    img = qrcode.make(post_command)
+    # (your code for sending the QR code and final message here)
+    # The QR code will now be for the post_url
+    
+    img = qrcode.make(post_url)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
         img.save(tmpfile.name)
         with open(tmpfile.name, 'rb') as qr_code_file:
-            await update.message.reply_photo(photo=qr_code_file, caption=f"Here's your QR code.\nCommand: `{post_command}`")
+            await update.message.reply_photo(photo=qr_code_file, caption=f"Here's your QR code.\nURL: {post_url}")
         os.remove(tmpfile.name)
 
-    await update.message.reply_text(f"✅ Done!\n{shareable_text}")
+    await update.message.reply_text("✅ Done!")
     del user_data_store[update.effective_chat.id]
     return ConversationHandler.END
 
