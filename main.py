@@ -1,32 +1,35 @@
-# main.py
 import os
-from telegram.ext import ApplicationBuilder, ConversationHandler, CommandHandler   
+import logging
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
 from campaign_qr_bot import conv_handler
 
-# Get the bot token from the environment variable
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def main():
-    """Starts the bot."""
-    if not BOT_TOKEN:
-        print("Error: BOT_TOKEN environment variable is not set!")
+def main() -> None:
+    """Start the bot."""
+    PORT = int(os.environ.get("PORT", 8000))
+    TOKEN = os.getenv("BOT_TOKEN")
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
+    if not all([TOKEN, WEBHOOK_URL]):
+        logger.error("Required environment variables are not set.")
         return
 
-    # Build the application
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    application = Application.builder().token(TOKEN).build()
 
-    # Add the ConversationHandler for the main bot flow
-    app.add_handler(conv_handler)
+    # Add the conversation handler to the application
+    application.add_handler(conv_handler)
     
-    # Add the new CommandHandler for viewing private posts
-    app.add_handler(CommandHandler("view_post", view_post_command_handler))
-
-    # Set up the webhook
-    app.run_webhook(
+    # Run the bot with webhook
+    application.run_webhook(
         listen="0.0.0.0",
-        port=int(os.getenv("PORT", "8000")),
-        url_path=BOT_TOKEN,
-        webhook_url=f"{os.getenv('WEBHOOK_URL')}/{BOT_TOKEN}"
+        port=PORT,
+        url_path=TOKEN,
+        webhook_url=f"{WEBHOOK_URL}/{TOKEN}"
     )
 
 if __name__ == "__main__":
