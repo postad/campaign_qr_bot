@@ -43,11 +43,11 @@ async def get_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ This is your post preview. Type 'yes' to confirm and publish.")
     return CONFIRM
 
-# The confirm_post function (with a public channel)
-
-async def confirm_post_public(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def confirm_post(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Publishes the post and then edits it to only show a link."""
     if update.message.text.lower() != 'yes':
-        # (your cancellation code here)
+        await update.message.reply_text("❌ Post canceled.")
+        del user_data_store[update.effective_chat.id]
         return ConversationHandler.END
 
     data = user_data_store[update.effective_chat.id]
@@ -55,7 +55,8 @@ async def confirm_post_public(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Assume CAMPAIGN_CHANNEL is a public channel username like '@my_public_channel'
     campaign_channel_username = os.getenv("CAMPAIGN_CHANNEL")
     if not campaign_channel_username:
-        # (your error handling code here)
+        await update.message.reply_text("❌ Configuration error: CAMPAIGN_CHANNEL not set.")
+        del user_data_store[update.effective_chat.id]
         return ConversationHandler.END
 
     # Step 1: Post the full content to the public channel
@@ -74,10 +75,8 @@ async def confirm_post_public(update: Update, context: ContextTypes.DEFAULT_TYPE
         message_id=sent_msg.message_id,
         caption=f"Here is the post:\n{post_url}"
     )
-
-    # (your code for sending the QR code and final message here)
-    # The QR code will now be for the post_url
     
+    # Step 4: Generate a QR code for the public URL
     img = qrcode.make(post_url)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
         img.save(tmpfile.name)
@@ -96,30 +95,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_data_store[update.effective_chat.id]
     return ConversationHandler.END
 
-async def view_post_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handles the custom command to view a specific post."""
-    command_text = update.message.text
-    try:
-        # Extract the message_id from the command, e.g., '/view_post_123'
-        message_id = int(command_text.split('_')[-1])
-        campaign_channel_id = os.getenv("CAMPAIGN_CHANNEL")
-
-        if not campaign_channel_id:
-            await update.message.reply_text("❌ Configuration error: CAMPAIGN_CHANNEL (ID) not set.")
-            return
-
-        # Use copy_message to forward the post to the user
-        await context.bot.copy_message(
-            chat_id=update.effective_chat.id,
-            from_chat_id=campaign_channel_id,
-            message_id=message_id
-        )
-    except (ValueError, IndexError):
-        await update.message.reply_text("Invalid command format. Please use the command provided to you.")
-    except Exception as e:
-        await update.message.reply_text(f"An error occurred while fetching the post: {e}")
-
 # Define the ConversationHandler for use in the main script
+# All functions referenced here must be defined above this line.
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler("start", start)],
     states={
